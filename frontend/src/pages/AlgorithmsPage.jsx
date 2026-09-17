@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import ArrayVisualizer from "../components/ArrayVisualizer";
 
+import StructureVisualizer from "../components/StructureVisualizer";
 import ComplexityPanel from "../components/ComplexityPanel";
 import VisualizerControls from "../components/VisualizerControls";
 import InputPanel from "../components/InputPanel";

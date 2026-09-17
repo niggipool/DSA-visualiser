@@ -1,5 +1,3 @@
-
-
 export const categories = [
   "Sorting",
   "Searching",
@@ -68,7 +66,11 @@ export const REGISTRY = {
     kind: "array",
     input: "search",
   },
-  //"Searching:Binary Search": { endpoint: "/api/searching/binary", kind: "array", input: "search" },
+  "Searching:Binary Search": {
+    endpoint: "/api/searching/binary",
+    kind: "array",
+    input: "search",
+  },
 
   // Graphs
   //"Graph:DFS": { endpoint: "/api/graphs/dfs", kind: "graph", input: "graph" },
@@ -106,7 +108,7 @@ export const REGISTRY = {
     sample:
       "insert_head 30\ninsert_head 12\ninsert_tail 7\ninsert_at 99 2\nsearch 7\ndelete 99",
   },
-  "Data Structures:Heap": {
+ /* "Data Structures:Heap": {
     endpoint: "/api/structures/heap",
     kind: "structure",
     input: "operations",
@@ -121,7 +123,7 @@ export const REGISTRY = {
     ops: ["put", "get", "delete"],
     sample:
       "put apple 5\nput banana 3\nput cherry 9\nput date 1\nget cherry\ndelete banana\nget banana",
-  },
+  }, */
 };
 
 export const registryKey = (category, algorithm) => `${category}:${algorithm}`;

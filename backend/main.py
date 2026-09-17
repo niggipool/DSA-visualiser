@@ -16,6 +16,12 @@ from algorithms.sorting.counting_sort import counting_sort
 
 
 from algorithms.searching.linear_search import linear_search
+from algorithms.searching.binary_search import binary_search
+
+from algorithms.DataStruct.Stack import run_stack
+from algorithms.DataStruct.Queue import run_queue
+from algorithms.DataStruct.linked_list import run_linked_list
+
 
 
 # Guard rails. Visualization stops being readable well before these limits, and
@@ -37,9 +43,7 @@ app.add_middleware(
 )
 
 
-# --------------------------------------------------------------------------- #
-# Request models
-# --------------------------------------------------------------------------- #
+
 class ArrayInput(BaseModel):
     array: list[int] = Field(..., min_length=1)
 
@@ -146,7 +150,21 @@ def run_counting(data: ArrayInput):
 def run_linear(data: SearchInput):
     return linear_search(validate_array(data.array), data.target)
 
+@app.post("/api/searching/binary")
+def run_binary(data: SearchInput):
+    return binary_search(validate_array(data.array), data.target)
 
 
 
+@app.post("/api/structures/stack")
+def run_stack_route(data: StructureInput):
+    return run_stack(validate_operations(data.operations))
 
+
+@app.post("/api/structures/queue")
+def run_queue_route(data: StructureInput):
+    return run_queue(validate_operations(data.operations))
+
+@app.post("/api/structures/linked-list")
+def run_linked_list_route(data: StructureInput):
+    return run_linked_list(validate_operations(data.operations))
