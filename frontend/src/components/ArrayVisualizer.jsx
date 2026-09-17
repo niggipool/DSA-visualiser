@@ -52,17 +52,25 @@ const ROLE_STYLES = {
 
 /** Decide how a single slot should look for the current step. */
 function roleFor(slot, step) {
+  const isSorted = step.sorted?.includes(slot);
   const touched = step.indices?.includes(slot);
   const isActive = step.active === slot;
 
-  if (isActive && (step.type === "select" || step.type === "insert")) return "key";
+  // Sorted always wins over compare/shift/key.
+  if (isSorted) return "sorted";
+
+  if (isActive && (step.type === "select" || step.type === "insert")) {
+    return "key";
+  }
+
   if (touched) {
     if (step.type === "swap") return "swap";
     if (step.type === "shift") return isActive ? "key" : "shift";
     if (step.type === "compare") return isActive ? "key" : "compare";
   }
+
   if (isActive) return "key";
-  if (step.sorted?.includes(slot)) return "sorted";
+
   return "base";
 }
 

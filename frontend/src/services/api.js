@@ -55,12 +55,16 @@ async function postJson(path, body, signal) {
  */
 export async function fetchSortSteps(algorithm, array, signal) {
   const path = ENDPOINTS[algorithm];
-  if (!path) throw new ApiError(`${algorithm} is not implemented yet.`);
+
+  if (!path) {
+    throw new ApiError(`${algorithm} is not implemented yet.`);
+  }
 
   const result = await postJson(path, { array }, signal);
 
-  if (!Array.isArray(result.steps) || !Array.isArray(result.array ?? result.swapped_array)) {
+  if (!Array.isArray(result.steps) || !Array.isArray(result.swapped_array)) {
     throw new ApiError("The backend returned an unexpected response shape.");
   }
+
   return result;
 }

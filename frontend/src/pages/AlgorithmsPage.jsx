@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
+import { fetchSortSteps, isImplemented } from "../services/api.js";
+import { useStepPlayer } from "../hooks/useStepPlayer.js";
 import { Link } from "react-router-dom";
-import { Play, Pause, RotateCcw, StepForward,ChevronRight,ChevronDown } from "lucide-react";
+import ArrayVisualizer from "../components/ArrayVisualizer.jsx";
+import ComplexityPanel from "../components/ComplexityPanel.jsx";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  StepForward,
+  ChevronRight,
+  ChevronDown,
+  StepBack,
+} from "lucide-react";
 
 const categories = [
   "Sorting",
@@ -30,7 +42,6 @@ const algorithmsByCategory = {
   Hashing: ["Hash Table", "Open Addressing", "Chaining"],
 };
 const starterArray = [42, 17, 68, 9, 31, 56, 24, 73, 12, 49];
-const apiBase = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 //DETAILS
 function algorithmDetails(category, algorithm) {
@@ -582,35 +593,154 @@ function algorithmDetails(category, algorithm) {
 function adaptApiSteps(result) {
   let comparisons = 0;
   let swaps = 0;
+
   const frames = result.steps.map((step) => {
-    if (!step.swapped) comparisons += 1;
-    if (step.swapped) swaps += 1;
+    if (step.type === "compare") comparisons += 1;
+    if (step.swapped || step.type === "swap") swaps += 1;
+
     return {
-      values: step.array,
-      active: step.compared,
+      array: step.array,
+      ids: step.ids ?? step.array.map((_, index) => index),
+      indices: step.indices ?? [],
+      active: step.active ?? null,
+      compared: step.compared ?? [],
       comparisons,
       swaps,
-      sorted: false,
+      sorted: step.sorted ?? [],
+      message: step.message ?? "",
+      type: step.type ?? "event",
     };
   });
+
   return [
     {
-      values: frames[0]?.values ?? result.swapped_array,
-      active: [],
+      array: frames[0]?.array ?? result.swapped_array,
+      ids: frames[0]?.ids ?? result.swapped_array.map((_, index) => index),
+      indices: [],
+      active: null,
+      compared: [],
       comparisons: 0,
       swaps: 0,
-      sorted: false,
+      sorted: [],
+      message: "",
+      type: "start",
     },
+
     ...frames,
+
     {
-      values: result.swapped_array,
-      active: [],
+      array: result.swapped_array,
+      ids: frames.at(-1)?.ids ?? result.swapped_array.map((_, index) => index),
+      indices: [],
+      active: null,
+      compared: [],
       comparisons,
       swaps,
-      sorted: true,
+      sorted: result.swapped_array.map((_, index) => index),
+      message: "Array is fully sorted",
+      type: "done",
     },
   ];
 }
+
+function EventLogger({ steps, frame }) {
+  const events = steps.slice(0, frame + 1).filter((step) => step.message);
+
+  const getTypeStyle = (type) => {
+    switch (type) {
+      case "compare":
+        return "text-yellow-400";
+
+      case "swap":
+        return "text-red-400";
+
+      case "shift":
+        return "text-orange-400";
+
+      case "insert":
+        return "text-emerald-400";
+
+      case "select":
+        return "text-cyan-400";
+
+      case "sorted":
+        return "text-emerald-300";
+
+      case "done":
+        return "text-emerald-400";
+
+      default:
+        return "text-zinc-400";
+    }
+  };
+
+  const formatType = (type) => {
+    if (!type) return "EVENT";
+
+    return type.toUpperCase();
+  };
+
+  return (
+    <section className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-panel/80">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+        <h3 className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300">
+          Event Log
+        </h3>
+
+        <span className="font-mono text-[10px] text-zinc-600">
+          {events.length} events
+        </span>
+      </div>
+
+      <div className="max-h-64 overflow-y-auto p-3">
+        {events.length === 0 ? (
+          <p className="px-2 py-4 text-center font-mono text-xs text-zinc-600">
+            Waiting for algorithm events...
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {events.map((event, index) => {
+              const isCurrent = index === events.length - 1;
+
+              return (
+                <div
+                  key={`${index}-${event.message}`}
+                  className={`flex items-start gap-3 rounded-md px-2 py-1.5 transition ${
+                    isCurrent ? "bg-white/[0.04]" : ""
+                  }`}
+                >
+                  {/* Event number */}
+                  <span className="w-6 shrink-0 text-right font-mono text-[10px] text-zinc-700">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+
+                  {/* Event type */}
+                  <span
+                    className={`w-16 shrink-0 font-mono text-[10px] font-bold ${getTypeStyle(
+                      event.type,
+                    )}`}
+                  >
+                    {formatType(event.type)}
+                  </span>
+
+                  {/* Message */}
+                  <span
+                    className={`font-mono text-xs ${
+                      isCurrent ? "text-zinc-200" : "text-zinc-500"
+                    }`}
+                  >
+                    {event.message}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function Metric({ label, value }) {
   return (
     <div className="min-w-20 rounded-md border border-white/10 px-2 py-1.5 text-center">
@@ -629,75 +759,73 @@ export default function AlgorithmsPage() {
   );
   const [array, setArray] = useState(starterArray);
   const [steps, setSteps] = useState([]);
-  const [frame, setFrame] = useState(0);
-  const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(55);
+  const [meta, setMeta] = useState(null);
+  const [stats, setStats] = useState(null);
+  const {
+    frame,
+    playing,
+    atEnd,
+    atStart,
+    transitionMs,
+    play,
+    pause,
+    next,
+    previous,
+    reset,
+  } = useStepPlayer(steps, speed);
   const [showConcepts, setShowConcepts] = useState(false);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
   const visibleAlgorithms = algorithmsByCategory[category];
-  const isBubbleSort = selectedAlgorithm === "Bubble Sort";
-  const isInsertionSort = selectedAlgorithm === "Insertion Sort";
-  const isArrayVisualizer = isBubbleSort || isInsertionSort;
+  const isArrayVisualizer = isImplemented(selectedAlgorithm);
   const isSortingCategory = category === "Sorting" || category === "Searching";
   const details = algorithmDetails(category, selectedAlgorithm);
   const current = steps[Math.min(frame, Math.max(steps.length - 1, 0))] ?? {
-    values: array,
-    active: [],
+    array,
+    ids: array.map((_, index) => index),
+    indices: [],
+    active: null,
     comparisons: 0,
     swaps: 0,
-    sorted: false,
+    sorted: [],
+    message: "",
+    type: "start",
   };
   useEffect(() => {
     const controller = new AbortController();
 
     if (!isArrayVisualizer) {
       setSteps([]);
+      setMeta(null);
+      setStats(null);
       setLoading(false);
       setApiError("");
       return () => controller.abort();
     }
-
-    async function fetchSteps() {
+    async function loadSteps() {
       setLoading(true);
       setApiError("");
-      setRunning(false);
-      setFrame(0);
-
-      const endpoint =
-        selectedAlgorithm === "Bubble Sort"
-          ? "/api/sorting/bubble"
-          : "/api/sorting/insertion";
 
       try {
-        const response = await fetch(`${apiBase}${endpoint}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ array }),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`API returned ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        if (
-          !Array.isArray(result.steps) ||
-          !Array.isArray(result.swapped_array)
-        ) {
-          throw new Error("Unexpected API response");
-        }
+        const result = await fetchSortSteps(
+          selectedAlgorithm,
+          array,
+          controller.signal,
+        );
 
         setSteps(adaptApiSteps(result));
+        setMeta(result.meta ?? null);
+        setStats(result.stats ?? null);
       } catch (error) {
-        if (error.name !== "AbortError") {
-          setSteps([]);
-          setApiError(
-            `${selectedAlgorithm} API is unavailable. Start the FastAPI backend on port 8000 and try again.`,
-          );
-        }
+        if (error.name === "AbortError") return;
+
+        setSteps([]);
+        setMeta(null);
+        setStats(null);
+        setApiError(
+          error.message || `${selectedAlgorithm} API is unavailable.`,
+        );
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
@@ -705,25 +833,11 @@ export default function AlgorithmsPage() {
       }
     }
 
-    fetchSteps();
+    loadSteps();
 
     return () => controller.abort();
   }, [array, selectedAlgorithm, isArrayVisualizer]);
-  useEffect(() => {
-    if (!running || loading || frame >= steps.length - 1) return undefined;
-    const timer = window.setTimeout(
-      () => {
-        setFrame((value) => Math.min(value + 1, steps.length - 1));
-        if (frame + 1 >= steps.length - 1) setRunning(false);
-      },
-      720 - speed * 6,
-    );
-    return () => window.clearTimeout(timer);
-  }, [frame, loading, running, speed, steps.length]);
-  const reset = () => {
-    setRunning(false);
-    setFrame(0);
-  };
+
   const selectCategory = (nextCategory) => {
     setCategory(nextCategory);
     setSelectedAlgorithm(algorithmsByCategory[nextCategory][0]);
@@ -806,8 +920,8 @@ export default function AlgorithmsPage() {
           <section className="mt-3 rounded-lg border border-white/10 bg-panel/80 p-3 sm:p-4">
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => setRunning(true)}
-                disabled={loading || running || frame === steps.length - 1}
+                onClick={play}
+                disabled={loading || playing || steps.length === 0}
                 className="rounded-md border border-neon bg-neon/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-neon/20 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <span className="flex items-center gap-1">
@@ -816,8 +930,8 @@ export default function AlgorithmsPage() {
                 </span>
               </button>
               <button
-                onClick={() => setRunning(false)}
-                disabled={!running}
+                onClick={pause}
+                disabled={!playing}
                 className="rounded-md border border-amber-400/40 px-3 py-2 text-sm text-zinc-300  hover:bg-amber-400/5 disabled:opacity-40"
               >
                 <span className="flex items-center gap-1">
@@ -833,15 +947,20 @@ export default function AlgorithmsPage() {
                 </span>
               </button>
               <button
-                onClick={() => {
-                  setRunning(false);
-                  setFrame((value) => Math.min(value + 1, steps.length - 1));
-                }}
-                disabled={loading}
+                onClick={next || atEnd}
                 className="rounded-md border border-white/15 px-3 py-2 text-sm text-zinc-300 disabled:opacity-40 hover:bg-white/10 "
               >
                 <span className="flex items-center gap-1">
                   <StepForward size={16} /> Step mode
+                </span>
+              </button>
+              <button
+                onClick={previous}
+                disabled={loading || atStart}
+                className="rounded-md border border-white/15 px-3 py-2 text-sm text-zinc-300 disabled:opacity-40 hover:bg-white/10"
+              >
+                <span className="flex items-center gap-1">
+                  <StepBack size={16} /> Previous
                 </span>
               </button>
               <label className="ml-auto flex min-w-48 flex-1 items-center gap-3 px-1 text-sm text-zinc-400 sm:max-w-xs">
@@ -894,34 +1013,8 @@ export default function AlgorithmsPage() {
                 STEP {Math.min(frame + 1, steps.length)} / {steps.length}
               </p>
             </div>
-            <div
-              className="mt-8 flex h-72 items-end justify-center gap-2 border-b border-white/10 px-2 pb-1 sm:gap-3"
-              aria-label="Array visualization"
-            >
-              {current.values.map((value, index) => (
-                <Bar
-                  key={`${index}-${value}`}
-                  value={value}
-                  index={index}
-                  comparing={current.active.includes(index)}
-                  sorted={current.sorted}
-                />
-              ))}
-            </div>
-            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-zinc-400">
-              <span>
-                <i className="mr-2 inline-block size-2 rounded-sm bg-crimson" />
-                Unsorted
-              </span>
-              <span>
-                <i className="mr-2 inline-block size-2 rounded-sm bg-yellow-400/70" />
-                Comparing
-              </span>
-              <span>
-                <i className="mr-2 inline-block size-2 rounded-sm bg-emerald-400/80 " />
-                Complete
-              </span>
-            </div>
+
+            <ArrayVisualizer step={current} transitionMs={transitionMs} />
           </section>
         ) : (
           <section className="mt-8 rounded-xl border border-white/10 bg-panel/80 p-5 sm:p-7">
@@ -936,6 +1029,11 @@ export default function AlgorithmsPage() {
             </p>
           </section>
         )}
+        <EventLogger steps={steps} frame={frame} />
+
+        {isArrayVisualizer && !loading && !apiError && (
+          <ComplexityPanel meta={meta} stats={stats} />
+        )}
         <section
           id="concepts"
           className="mt-4 rounded-lg border border-white/10 bg-panel/80"
@@ -945,7 +1043,9 @@ export default function AlgorithmsPage() {
             aria-expanded={showConcepts}
             className="flex w-full items-center gap-2 px-4 py-3 text-left font-semibold text-zinc-100"
           >
-            <span className="text-neon">{showConcepts ? <ChevronDown /> : <ChevronRight />}</span>{" "}
+            <span className="text-neon">
+              {showConcepts ? <ChevronDown /> : <ChevronRight />}
+            </span>{" "}
             Principles & Key Concepts
           </button>
           {showConcepts && (
@@ -970,23 +1070,5 @@ function ComingSoon({ algorithm }) {
       <strong>{algorithm}:</strong> Coming soon — backend visualizer not
       implemented yet.
     </section>
-  );
-}
-function Bar({ value, index, comparing, sorted }) {
-  return (
-    <div className="group flex h-full min-w-0 flex-1 flex-col justify-end">
-      <span
-        className={`mb-2 text-center font-mono text-xs ${comparing ? "text-yellow-400/70" : sorted ? "text-emerald-300" : "text-zinc-500"}`}
-      >
-        {value}
-      </span>
-      <div
-        style={{ height: `${value}%` }}
-        className={`min-h-3 rounded-t-sm transition-[height,background-color,box-shadow] duration-200 ${comparing ? "bg-yellow-400/70 shadow-yellow-400" : sorted ? "bg-emerald-400/80" : "bg-crimson/70 group-hover:bg-crimson"}`}
-      />
-      <span className="mt-2 text-center font-mono text-[10px] text-zinc-600">
-        {index}
-      </span>
-    </div>
   );
 }
