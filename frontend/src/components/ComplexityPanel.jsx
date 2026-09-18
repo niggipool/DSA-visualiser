@@ -1,13 +1,4 @@
-/**
- * Renders the `meta` block the backend ships with every run, so the complexity
- * shown beside an algorithm always comes from the same place as the algorithm.
- *
- * `meta.time` is a free-form map: sorts use best/average/worst, data structures
- * use their operation names. Rendering whatever keys arrive means one component
- * covers both without branching.
- *
- * `stats` are the real counts from this run, not estimates.
- */
+
 
 function Cell({ label, value, accent }) {
   return (
@@ -52,7 +43,9 @@ export default function ComplexityPanel({ meta, stats }) {
         </div>
       </div>
 
-      <p className="mt-2 text-sm leading-relaxed text-zinc-400">{meta.description}</p>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+        {meta.description}
+      </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
         {timeEntries.map(([label, value]) => (

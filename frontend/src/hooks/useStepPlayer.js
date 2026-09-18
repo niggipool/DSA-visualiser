@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/**
- * Replays a backend-generated step array.
- *
- * The whole point is that `frame` is the single source of truth: the rendered
- * array is always `steps[frame].array`, never something accumulated over time.
- * That is what makes Previous Step exact rather than approximate — going back
- * is just decrementing an index, so no state has to be "undone".
- */
 export function useStepPlayer(steps, speed) {
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -16,14 +8,13 @@ export function useStepPlayer(steps, speed) {
   const lastFrame = Math.max(steps.length - 1, 0);
   const atEnd = frame >= lastFrame;
 
-  // A new step list means a fresh run.
+
   useEffect(() => {
     setFrame(0);
     setPlaying(false);
   }, [steps]);
 
-  // Map the 15–100 slider onto a sensible delay. Also handed to the bars as a
-  // CSS transition duration so movement finishes before the next step lands.
+
   const delay = Math.round(900 - speed * 8);
   const transitionMs = Math.max(90, Math.round(delay * 0.75));
 
@@ -42,7 +33,7 @@ export function useStepPlayer(steps, speed) {
 
   const play = useCallback(() => {
     if (steps.length === 0) return;
-    // Pressing play at the end restarts rather than doing nothing.
+   
     setFrame((value) => (value >= lastFrame ? 0 : value));
     setPlaying(true);
   }, [lastFrame, steps.length]);

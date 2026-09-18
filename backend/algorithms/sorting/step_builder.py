@@ -1,39 +1,3 @@
-"""
-StepRecorder
-============
-
-Every sorting algorithm records its work through this one class, so that the
-whole backend emits exactly the same step schema and the frontend only ever
-needs to understand one format.
-
-A step looks like this:
-
-    {
-      "array":    [42, 17, 68, 9],   # the array AFTER this operation
-      "ids":      [0, 1, 2, 3],      # stable identity of each slot's element
-      "type":     "compare",         # compare | swap | shift | insert | select | sorted | done
-      "indices":  [2, 3],            # the slots this operation touched
-      "active":   3,                 # the "current"/key element, or None
-      "sorted":   [3],               # slots known to be in final position
-      "message":  "Compare 68 and 9",
-      "compared": [2, 3],            # legacy alias for `indices`
-      "swapped":  False              # legacy flag, kept for compatibility
-    }
-
-Two design notes worth remembering:
-
-1. `ids` is the important addition. The array alone tells you *what* the values
-   are, not *which* element moved. By carrying a stable id per element and
-   permuting it exactly the way the values are permuted, the frontend can key
-   each bar by id and let CSS animate it from its old slot to its new slot.
-   Without this the frontend has to guess, and guessing is what caused bars to
-   teleport.
-
-2. `compared` and `swapped` are still emitted. The original frontend read those
-   fields, so nothing that already worked breaks while the new fields are added.
-"""
-
-
 class StepRecorder:
     def __init__(self, array):
         self.array = list(array)
@@ -99,13 +63,7 @@ class StepRecorder:
         )
 
     def shift_right(self, src, key_value, key_id, message=None):
-        """
-        Insertion-sort shift: the element at `src` moves one slot right into the
-        hole, and the key drops into the slot the element just left.
-
-        The key travelling with the hole is what makes the animation honest: the
-        key visibly walks left one slot per shift instead of jumping to the front.
-        """
+    
         moved = self.array[src]
         moved_id = self.ids[src]
 

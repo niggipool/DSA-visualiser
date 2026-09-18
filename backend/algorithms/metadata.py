@@ -1,13 +1,4 @@
-"""
-Algorithm and data-structure metadata.
 
-Complexity lives next to the implementations rather than in the UI, so an
-algorithm and its documented cost cannot drift apart. Every endpoint returns its
-entry under `meta`, and ComplexityPanel renders it directly.
-
-`time` is a free-form map so each entry can describe whatever axes make sense:
-sorts use best/average/worst, data structures use their operation names.
-"""
 
 METADATA = {
     # ------------------------------------------------------------------ #

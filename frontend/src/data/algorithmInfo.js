@@ -1,11 +1,4 @@
-/**
- * Static reference content for every algorithm listed in the UI.
- *
- * Moved out of AlgorithmsPage verbatim so the page file stays readable. The
- * content itself is unchanged. For algorithms the backend can actually run, the
- * authoritative complexity numbers now come from the API's `meta` block
- * instead — this map covers descriptions and the "coming soon" entries.
- */
+
 
 export const categories = [
   "Sorting",

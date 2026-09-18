@@ -1,9 +1,5 @@
 import { Play, Pause, RotateCcw, StepForward, StepBack } from "lucide-react";
 
-/**
- * Playback transport only. Everything that shapes the *input* to a run lives in
- * InputPanel; this component just moves through steps that already exist.
- */
 
 const button =
   "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm transition disabled:cursor-not-allowed disabled:opacity-40";

@@ -1,31 +1,4 @@
-"""
-Insertion Sort
-==============
-
-Pure and deterministic: given an array it returns the complete list of
-visualization steps. It never depends on frontend state.
-
-The important behaviour, using [42, 17, 68, 9]:
-
-    i=1  select 17
-         compare 42 and 17   -> 42 > 17, shift 42 right
-         insert 17 at 0
-
-    i=2  select 68
-         compare 42 and 68   -> 42 <= 68, key stays put
-         insert 68 at 2
-
-    i=3  select 9
-         compare 68 and 9    -> shift 68 right
-         compare 42 and 9    -> shift 42 right
-         compare 17 and 9    -> shift 17 right
-         insert 9 at 0
-
-Every comparison and every shift is its own step, so 9 walks to the front one
-slot at a time instead of teleporting.
-"""
-
-from .step_builder import StepRecorder
+from ..step_builder import StepRecorder
 from ..metadata import METADATA
 
 

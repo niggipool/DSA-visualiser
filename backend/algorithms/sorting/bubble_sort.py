@@ -1,16 +1,4 @@
-"""
-Bubble Sort
-===========
-
-The algorithm itself is unchanged from the original implementation. The only
-difference is that it now records through StepRecorder, so it emits the same
-schema as Insertion Sort (ids, type, message, progressive sorted set) instead
-of the old three-field step.
-
-The early-exit on a clean pass is kept: it is why the best case is O(n).
-"""
-
-from .step_builder import StepRecorder
+from ..step_builder import StepRecorder
 from ..metadata import METADATA
 
 

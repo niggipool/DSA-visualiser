@@ -1,78 +1,29 @@
-/**
- * ArrayVisualizer
- * ===============
- *
- * The fix for the teleporting bars lives here.
- *
- * Previously each bar was keyed by `${index}-${value}`. When an element moved,
- * its key changed, so React unmounted the old node and mounted a new one. A
- * freshly mounted node has no previous position to animate from, so it just
- * appeared at its destination.
- *
- * Now every bar is keyed by the stable `id` the backend sends with each step,
- * and the DOM order never changes — bars are sorted by id and positioned purely
- * with `translateX`. When the backend moves an element from slot 3 to slot 2,
- * the same DOM node stays mounted and its transform changes, so the browser
- * animates it across. No element ever teleports, and no delay is faked: the
- * transition duration is derived from the playback speed.
- */
+import { motion, AnimatePresence } from "framer-motion";
 
-const ROLE_STYLES = {
-  base: {
-    bar: "bg-crimson/70",
-    text: "text-zinc-400",
-    glow: "",
-  },
-  compare: {
-    bar: "bg-amber-400",
-    text: "text-amber-300",
-    glow: "shadow-[0_0_16px_rgba(251,191,36,.55)]",
-  },
-  swap: {
-    bar: "bg-neon",
-    text: "text-neon",
-    glow: "shadow-[0_0_20px_rgba(255,23,68,.7)]",
-  },
-  shift: {
-    bar: "bg-orange-400",
-    text: "text-orange-300",
-    glow: "shadow-[0_0_18px_rgba(251,146,60,.6)]",
-  },
-  key: {
-    bar: "bg-white",
-    text: "text-white",
-    glow: "shadow-[0_0_22px_rgba(255,255,255,.55)]",
-  },
-  sorted: {
-    bar: "bg-emerald-400/85",
-    text: "text-emerald-300",
-    glow: "",
-  },
+
+const ROLES = {
+  base: "bg-crimson/70",
+  compare: "bg-amber-400 shadow-[0_0_16px_rgba(251,191,36,.55)]",
+  swap: "bg-neon shadow-[0_0_20px_rgba(255,23,68,.7)]",
+  shift: "bg-orange-400 shadow-[0_0_18px_rgba(251,146,60,.6)]",
+  key: "bg-white shadow-[0_0_22px_rgba(255,255,255,.55)]",
+  probe: "bg-sky-400 shadow-[0_0_18px_rgba(56,189,248,.6)]",
+  found: "bg-emerald-400 shadow-[0_0_24px_rgba(52,211,153,.75)]",
+  sorted: "bg-emerald-400/85",
+  pivot: "bg-fuchsia-400 shadow-[0_0_18px_rgba(232,121,249,.6)]",
 };
 
-/** Decide how a single slot should look for the current step. */
-function roleFor(slot, step) {
-  const isSorted = step.sorted?.includes(slot);
-  const touched = step.indices?.includes(slot);
-  const isActive = step.active === slot;
-
-  // Sorted always wins over compare/shift/key.
-  if (isSorted) return "sorted";
-
-  if (isActive && (step.type === "select" || step.type === "insert")) {
-    return "key";
-  }
-
-  if (touched) {
-    if (step.type === "swap") return "swap";
-    if (step.type === "shift") return isActive ? "key" : "shift";
-    if (step.type === "compare") return isActive ? "key" : "compare";
-  }
-
-  if (isActive) return "key";
-
-  return "base";
-}
+const LABEL_COLOR = {
+  base: "text-zinc-400",
+  compare: "text-amber-300",
+  swap: "text-neon",
+  shift: "text-orange-300",
+  key: "text-white",
+  probe: "text-sky-300",
+  found: "text-emerald-300",
+  sorted: "text-emerald-300",
+  pivot: "text-fuchsia-300",
+};
 
 const TYPE_LABEL = {
   compare: "Compare",
@@ -80,81 +31,194 @@ const TYPE_LABEL = {
   shift: "Shift",
   insert: "Insert",
   select: "Select",
+  write: "Write",
+  divide: "Divide",
+  probe: "Probe",
+  found: "Found",
+  notfound: "Not found",
   sorted: "Sorted",
   done: "Done",
+  note: "Note",
+  idle: "Ready",
 };
+
+
+function roleFor(slot, step) {
+  const touched = step.indices?.includes(slot);
+  const active = step.active === slot;
+  const pointers = step.pointers ?? {};
+
+  if (step.found === slot && (step.type === "found" || step.type === "done"))
+    return "found";
+  if (step.type === "probe" && touched) return "probe";
+  if (pointers.pivot === slot) return "pivot";
+
+  if (touched) {
+    if (step.type === "swap") return "swap";
+    if (step.type === "shift") return active ? "key" : "shift";
+    if (step.type === "compare") return active ? "key" : "compare";
+    if (step.type === "write" || step.type === "insert") return "key";
+  }
+  if (active) return "key";
+  if (step.sorted?.includes(slot)) return "sorted";
+  return "base";
+}
 
 export default function ArrayVisualizer({ step, transitionMs = 240 }) {
   const values = step.array ?? [];
   const ids = step.ids ?? values.map((_, index) => index);
-  const count = values.length || 1;
-  const max = Math.max(...values, 1);
+  const pointers = step.pointers ?? {};
 
-  // Sort by id so the DOM order is fixed for the whole run. Position comes from
-  // the slot index, applied as a transform.
-  const bars = ids
-    .map((id, slot) => ({ id, slot, value: values[slot] }))
-    .sort((a, b) => a.id - b.id);
+
+  const allValues = [
+    ...values.filter((value) => value !== null),
+    ...(step.auxLeft ?? []),
+    ...(step.auxRight ?? []),
+  ];
+  const max = Math.max(...allValues, 1);
+
+  const spring = {
+    type: "spring",
+    stiffness: 420,
+    damping: 34,
+    duration: transitionMs / 1000,
+  };
+
+  const hasBuffer = step.auxLeft !== null && step.auxLeft !== undefined;
 
   return (
     <div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="rounded border border-neon/40 bg-neon/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[.18em] text-neon">
           {TYPE_LABEL[step.type] ?? step.type}
         </span>
-        <p className="truncate text-sm text-zinc-300">{step.message}</p>
+        <p className="min-w-0 flex-1 text-sm text-zinc-300">{step.message}</p>
+        {step.target !== undefined && step.target !== null && (
+          <span className="rounded border border-sky-400/40 bg-sky-400/10 px-2 py-0.5 font-mono text-lg text-sky-300">
+            target {step.target}
+          </span>
+        )}
       </div>
 
-      <div
-        className="relative mt-5 h-72 border-b border-white/10"
-        aria-label="Array visualization"
-        role="img"
-      >
-        {bars.map(({ id, slot, value }) => (
-          <div
-            key={id}
-            className="absolute bottom-0 top-0 px-[3px]"
-            style={{
-              width: `${100 / count}%`,
-              transform: `translateX(${slot * 100}%)`,
-              transition: `transform ${transitionMs}ms cubic-bezier(.4,0,.2,1)`,
-            }}
-          >
-            <Bar
-              value={value}
-              slot={slot}
-              heightPct={(value / max) * 100}
-              role={roleFor(slot, step)}
-              transitionMs={transitionMs}
-            />
-          </div>
-        ))}
+      {/* Main array */}
+      <div className="mt-6 flex h-64 items-end gap-1.5 border-b border-white/10">
+        {values.map((value, slot) => {
+          const id = ids[slot];
+          const role = roleFor(slot, step);
+
+          if (value === null) {
+            return (
+              <div key={`hole-${id}`} className="flex h-full flex-1 items-end">
+                <div className="h-8 w-full rounded-t-sm border border-dashed border-white/20 bg-white/[.02]" />
+              </div>
+            );
+          }
+
+          return (
+            <div key={id} className="flex h-full flex-1 flex-col justify-end">
+              <motion.div
+                layoutId={`el-${id}`}
+                transition={spring}
+                className="flex h-full flex-col justify-end"
+              >
+                <span
+                  className={`mb-1.5 text-center font-mono text-xs ${LABEL_COLOR[role]}`}
+                >
+                  {value}
+                </span>
+                <div
+                  style={{ height: `${(value / max) * 100}%` }}
+                  className={`min-h-3 rounded-t-sm transition-colors duration-150 ${ROLES[role]}`}
+                />
+              </motion.div>
+            </div>
+          );
+        })}
       </div>
+
+      {/* Slot indices and named pointers */}
+      <div className="flex gap-1.5">
+        {values.map((_, slot) => {
+          const marks = Object.entries(pointers)
+            .filter(([, index]) => index === slot)
+            .map(([name]) => name);
+          return (
+            <div key={slot} className="flex-1 text-center">
+              <span className="font-mono text-[10px] text-zinc-600">
+                {slot}
+              </span>
+              {marks.length > 0 && (
+                <p className="font-mono text-[9px] uppercase leading-tight text-neon">
+                  {marks.join(" ")}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Merge buffer */}
+      <AnimatePresence>
+        {hasBuffer && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-4 overflow-hidden"
+          >
+            <p className="font-mono text-[10px] uppercase tracking-[.18em] text-zinc-500">
+              Merge buffer — the O(n) extra space
+            </p>
+            <div className="mt-2 flex flex-wrap gap-6">
+              <BufferHalf
+                label="Left"
+                values={step.auxLeft ?? []}
+                ids={step.auxLeftIds ?? []}
+                spring={spring}
+              />
+              <BufferHalf
+                label="Right"
+                values={step.auxRight ?? []}
+                ids={step.auxRightIds ?? []}
+                spring={spring}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Legend />
     </div>
   );
 }
 
-function Bar({ value, slot, heightPct, role, transitionMs }) {
-  const style = ROLE_STYLES[role] ?? ROLE_STYLES.base;
+
+function BufferHalf({ label, values, ids, spring }) {
   return (
-    <div className="flex h-full flex-col justify-end">
-      <span
-        className={`mb-2 text-center font-mono text-xs transition-colors ${style.text}`}
-      >
-        {value}
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-[10px] uppercase text-zinc-500">
+        {label}
       </span>
-      <div
-        style={{
-          height: `${heightPct}%`,
-          transition: `height ${transitionMs}ms cubic-bezier(.4,0,.2,1), background-color 160ms, box-shadow 160ms`,
-        }}
-        className={`min-h-3 rounded-t-sm ${style.bar} ${style.glow}`}
-      />
-      <span className="mt-2 text-center font-mono text-[10px] text-zinc-600">
-        {slot}
-      </span>
+      <div className="flex min-h-9 items-center gap-1.5">
+        {values.length === 0 ? (
+          <span className="font-mono text-xs text-zinc-700">empty</span>
+        ) : (
+          values.map((value, index) => (
+            <motion.div
+              key={ids[index]}
+              layoutId={`el-${ids[index]}`}
+              transition={spring}
+              className={`grid size-9 place-items-center rounded border font-mono text-xs ${
+                index === 0
+                  ? "border-amber-400/70 bg-amber-400/15 text-amber-200"
+                  : "border-white/15 bg-white/[.03] text-zinc-300"
+              }`}
+            >
+              {value}
+            </motion.div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -165,8 +229,10 @@ function Legend() {
     ["bg-amber-400", "Comparing"],
     ["bg-orange-400", "Shifting"],
     ["bg-neon", "Swapping"],
-    ["bg-white", "Current key"],
-    ["bg-emerald-400/85", "Sorted"],
+    ["bg-fuchsia-400", "Pivot"],
+    ["bg-sky-400", "Probing"],
+    ["bg-white", "Current"],
+    ["bg-emerald-400/85", "Sorted / found"],
   ];
   return (
     <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-zinc-400">
