@@ -1,5 +1,3 @@
-
-
 const apiBase = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 export class ApiError extends Error {}
@@ -21,7 +19,6 @@ export async function postJson(path, body, signal) {
   }
 
   if (!response.ok) {
-
     let detail = `Request failed with status ${response.status}.`;
     try {
       const payload = await response.json();
@@ -36,7 +33,6 @@ export async function postJson(path, body, signal) {
 
   return response.json();
 }
-
 
 export async function runAlgorithm(entry, payload, signal) {
   if (!entry) throw new ApiError("That algorithm is not implemented yet.");

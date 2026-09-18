@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 
 import ArrayVisualizer from "../components/ArrayVisualizer";
 
-
 import ComplexityPanel from "../components/ComplexityPanel";
 import VisualizerControls from "../components/VisualizerControls";
 import InputPanel from "../components/InputPanel";
@@ -16,8 +15,6 @@ import {
   isImplemented,
 } from "../data/algorithms";
 import { algorithmDetails } from "../data/algorithmInfo";
-
-
 
 const DEFAULT_PAYLOAD = {
   array: { array: [42, 17, 68, 9, 31, 56, 24, 73] },
@@ -42,7 +39,6 @@ export default function AlgorithmsPage() {
   const details = algorithmDetails(category, algorithm);
   const steps = run?.steps ?? [];
   const player = useStepPlayer(steps, speed);
-
 
   const selectAlgorithm = (nextCategory, nextAlgorithm) => {
     setCategory(nextCategory);
